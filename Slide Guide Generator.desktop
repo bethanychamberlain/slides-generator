@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Slide Guide Generator
+Comment=Convert PDF slides into AI-generated student study guides
+Exec=/home/bethany/slide-guide-generator/venv/bin/python /home/bethany/slide-guide-generator/tray.py
+Icon=/home/bethany/slide-guide-generator/icon.png
+Terminal=false
+Categories=Education;Office;
+StartupNotify=true
