@@ -42,7 +42,6 @@ def start_server(icon, item=None):
         stderr=subprocess.DEVNULL,
     )
     icon.icon = load_icon("icon.png")
-    icon.notify("Slide Guide Generator started", "Server Running")
 
 
 def stop_server(icon, item=None):
