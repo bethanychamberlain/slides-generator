@@ -1,0 +1,26 @@
+# Environment
+.env
+venv/
+users.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated artifacts
+working_images/
+analysis_cache/
+questions_history.csv
+
+# Tool config
+.serena/
+.claude/
+
+# Session transcripts
+2026-*.txt
+
+# Usage logs (contain user emails)
+usage_logs/
+
+# macOS
+.DS_Store
