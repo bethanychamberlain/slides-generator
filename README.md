@@ -28,7 +28,7 @@ Upload a PDF, configure which slides are intro/content/conclusion, and the app g
 ### 3. Clone and install
 
 ```bash
-git clone git@github.com:bethanychamberlain/slides-generator.git
+git clone https://github.com/bethanychamberlain/slides-generator.git
 cd slides-generator
 python -m venv venv
 ```
