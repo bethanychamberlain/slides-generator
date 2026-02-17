@@ -16,4 +16,4 @@ questions_history.csv
 .claude/
 
 # Session transcripts
-*.txt
+2026-*.txt

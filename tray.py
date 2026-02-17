@@ -7,6 +7,7 @@ import subprocess
 import webbrowser
 import signal
 import sys
+import os
 from pathlib import Path
 
 import pystray
@@ -14,8 +15,15 @@ from PIL import Image
 
 APP_DIR = Path(__file__).parent
 APP_URL = "http://localhost:8501"
+
+# Cross-platform: venv/bin on Linux/macOS, venv/Scripts on Windows
+if os.name == "nt":
+    _streamlit = APP_DIR / "venv" / "Scripts" / "streamlit.exe"
+else:
+    _streamlit = APP_DIR / "venv" / "bin" / "streamlit"
+
 STREAMLIT_CMD = [
-    str(APP_DIR / "venv" / "bin" / "streamlit"),
+    str(_streamlit),
     "run", str(APP_DIR / "app.py"),
     "--server.headless", "true",
 ]
@@ -99,14 +107,15 @@ def main():
         start_server(icon)
         webbrowser.open(APP_URL)
 
-    # Clean shutdown on SIGTERM/SIGINT
+    # Clean shutdown on signals
     def handle_signal(signum, frame):
         stop_server(icon)
         icon.stop()
         sys.exit(0)
 
-    signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, handle_signal)
 
     icon.run(setup=on_setup)
 
