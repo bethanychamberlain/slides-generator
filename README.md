@@ -15,7 +15,7 @@ Upload a PDF, configure which slides are intro/content/conclusion, and the app g
 ### 2. Install Poppler (required for PDF conversion)
 
 - **Windows:**
-  1. Download the latest release from https://github.com/ossamamehmood/Poppler-Windows/releases
+  1. Download the latest release from https://github.com/oschwartz10612/poppler-windows/releases
   2. Extract to `C:\poppler`
   3. Add `C:\poppler\Library\bin` to your system PATH:
      - Search "Environment Variables" in Start menu
