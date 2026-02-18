@@ -13,8 +13,22 @@ from questions import get_question_text
 # Load environment variables from .env file
 load_dotenv(override=True)
 
-# Initialize Anthropic client (uses ANTHROPIC_API_KEY env variable)
-client = Anthropic()
+# Module-level client — initialized via set_api_key() or from env
+client = None
+
+
+def set_api_key(api_key):
+    """Set the API key and create the client. Called from the UI login screen."""
+    global client
+    client = Anthropic(api_key=api_key)
+
+
+def _ensure_client():
+    """Ensure client is initialized, falling back to env var."""
+    global client
+    if client is None:
+        client = Anthropic()
+    return client
 
 # Model configuration
 MODEL_FAST = "claude-sonnet-4-20250514"
@@ -48,7 +62,7 @@ def parse_json_response(text):
 
 def analyze_slide_intro(base64_image):
     """Analyze an introductory slide and return a summary string."""
-    response = client.messages.create(
+    response = _ensure_client().messages.create(
         model=MODEL_FAST,
         max_tokens=1000,
         system="You are an expert at analyzing lecture slides and extracting key information concisely.",
@@ -68,7 +82,7 @@ def analyze_slide_intro(base64_image):
 
 def analyze_slide_outro(base64_image):
     """Analyze a concluding slide and return a summary string."""
-    response = client.messages.create(
+    response = _ensure_client().messages.create(
         model=MODEL_FAST,
         max_tokens=1000,
         system="You are an expert at analyzing lecture slides and extracting key information concisely.",
@@ -138,7 +152,7 @@ IMPORTANT: For open_ended questions, always include an "example_answer" field wi
     if custom_instructions:
         prompt += f"\n\nAdditional context from instructor: {custom_instructions}"
 
-    response = client.messages.create(
+    response = _ensure_client().messages.create(
         model=MODEL_FAST,
         max_tokens=2500,
         system="You are an expert educator creating study guide questions from lecture slides. "
@@ -188,7 +202,7 @@ Write a clear, concise example answer that a student might give based on the sli
 Return ONLY the answer text, no additional formatting or explanation."""
 
                     try:
-                        response = client.messages.create(
+                        response = _ensure_client().messages.create(
                             model=MODEL_FAST,
                             max_tokens=500,
                             system="You are an expert educator providing model answers for study guide questions.",
@@ -257,7 +271,7 @@ Return ONLY valid JSON listing which questions to INCLUDE:
   ]
 }}"""
 
-    response = client.messages.create(
+    response = _ensure_client().messages.create(
         model=MODEL_ADVANCED,
         max_tokens=2000,
         system="You are reviewing questions for a student note-taking guide. "
@@ -326,7 +340,7 @@ IMPORTANT: For open_ended questions, always include an "example_answer" field wi
     if custom_instructions:
         prompt += f"\n\nAdditional context from instructor: {custom_instructions}"
 
-    response = client.messages.create(
+    response = _ensure_client().messages.create(
         model=model,
         max_tokens=2500,
         system="You are an expert educator creating study guide questions from lecture slides.",

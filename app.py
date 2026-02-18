@@ -13,6 +13,7 @@ from ai import (
     image_to_base64, analyze_slide_intro, analyze_slide_outro,
     analyze_slide_content, generate_example_answers,
     review_and_select_questions, regenerate_questions,
+    set_api_key,
 )
 from export_docx import create_docx
 from export_qti import create_canvas_qti
@@ -107,6 +108,27 @@ def clean_slide_question_keys(slide_num, old_count):
 
 st.set_page_config(page_title="Slide Guide Generator", layout="wide")
 st.title("Slide Guide Generator")
+
+# --- API Key Login ---
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+
+if not st.session_state.api_key:
+    st.write("Enter your Anthropic API key to get started.")
+    st.caption("Get a key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)")
+    key_input = st.text_input("API Key", type="password", placeholder="sk-ant-...")
+    if st.button("Start"):
+        if key_input.startswith("sk-ant-"):
+            set_api_key(key_input)
+            st.session_state.api_key = key_input
+            st.rerun()
+        else:
+            st.error("That doesn't look like a valid Anthropic API key. It should start with sk-ant-")
+    st.stop()
+
+# Key is set — initialize the client for this session
+set_api_key(st.session_state.api_key)
+
 st.write("Upload a presentation PDF to generate a student note-taking guide.")
 
 # Initialize session state
@@ -428,8 +450,10 @@ if st.session_state.analyzed:
     with top_col3:
         if st.button("Start Over", key="start_over_top"):
             cleanup_working_dir()
+            api_key = st.session_state.api_key
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
+            st.session_state.api_key = api_key
             st.rerun()
 
     # Show intro summary
@@ -768,9 +792,19 @@ if st.session_state.analyzed:
                 "Google Sheets for analysis."
             )
 
-    # Reset button
-    if st.button("Start Over"):
-        cleanup_working_dir()
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
+    # Reset buttons
+    reset_col1, reset_col2 = st.columns([1, 1])
+    with reset_col1:
+        if st.button("Start Over"):
+            cleanup_working_dir()
+            api_key = st.session_state.api_key  # preserve login
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.session_state.api_key = api_key
+            st.rerun()
+    with reset_col2:
+        if st.button("Log Out"):
+            cleanup_working_dir()
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
