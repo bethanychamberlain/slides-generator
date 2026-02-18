@@ -31,8 +31,8 @@ def _ensure_client():
     return client
 
 # Model configuration
-MODEL_FAST = "claude-sonnet-4-20250514"
-MODEL_ADVANCED = "claude-opus-4-20250514"
+MODEL_FAST = "claude-sonnet-4-6"
+MODEL_ADVANCED = "claude-opus-4-6"
 
 
 def image_to_base64(image):
