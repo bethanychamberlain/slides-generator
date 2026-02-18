@@ -1,11 +1,9 @@
-"""All Claude API calls and prompt logic."""
+"""AI API calls and prompt logic. Supports Anthropic (Claude) and Mistral."""
 
 import json
 import base64
 from io import BytesIO
 
-import anthropic
-from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from questions import get_question_text
@@ -13,27 +11,102 @@ from questions import get_question_text
 # Load environment variables from .env file
 load_dotenv(override=True)
 
-# Module-level client — initialized via set_api_key() or from env
-client = None
+# --- Provider configuration ---
+# Supported: "anthropic", "mistral"
+_provider = None
+_client = None
+
+# Model IDs per provider
+MODELS = {
+    "anthropic": {"fast": "claude-sonnet-4-6", "advanced": "claude-opus-4-6"},
+    "mistral": {"fast": "mistral-medium-latest", "advanced": "mistral-large-latest"},
+}
+
+PROVIDER_LABELS = {
+    "anthropic": "Anthropic (Claude)",
+    "mistral": "Mistral AI",
+}
 
 
-def set_api_key(api_key):
-    """Set the API key and create the client. Called from the UI login screen."""
-    global client
-    client = Anthropic(api_key=api_key)
+def set_provider(provider, api_key):
+    """Set the AI provider and API key. Called from the UI login screen."""
+    global _provider, _client
+    _provider = provider
+    if provider == "anthropic":
+        from anthropic import Anthropic
+        _client = Anthropic(api_key=api_key)
+    elif provider == "mistral":
+        from mistralai import Mistral
+        _client = Mistral(api_key=api_key)
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
 
 
 def _ensure_client():
-    """Ensure client is initialized, falling back to env var."""
-    global client
-    if client is None:
-        client = Anthropic()
-    return client
+    """Ensure client is initialized, falling back to Anthropic from env."""
+    global _provider, _client
+    if _client is None:
+        from anthropic import Anthropic
+        _provider = "anthropic"
+        _client = Anthropic()
+    return _client
 
-# Model configuration
-MODEL_FAST = "claude-sonnet-4-6"
-MODEL_ADVANCED = "claude-opus-4-6"
 
+def _model(tier):
+    """Get the model ID for the current provider. tier is 'fast' or 'advanced'."""
+    return MODELS[_provider][tier]
+
+
+def _make_vision_message(base64_image, text):
+    """Build a user message with image + text in the right format for the current provider."""
+    if _provider == "anthropic":
+        return {
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
+                {"type": "text", "text": text},
+            ]
+        }
+    else:  # mistral
+        return {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"},
+                {"type": "text", "text": text},
+            ]
+        }
+
+
+def _make_text_message(text):
+    """Build a user message with text only."""
+    return {"role": "user", "content": text}
+
+
+def _call(model, max_tokens, system, messages):
+    """Unified API call that dispatches to the correct provider."""
+    client = _ensure_client()
+
+    if _provider == "anthropic":
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+        )
+        return response.content[0].text
+
+    else:  # mistral
+        # Mistral uses a system message in the messages array
+        full_messages = [{"role": "system", "content": system}] + messages
+        response = client.chat.complete(
+            model=model,
+            max_tokens=max_tokens,
+            messages=full_messages,
+        )
+        return response.choices[0].message.content
+
+
+# --- Shared utilities ---
 
 def image_to_base64(image):
     """Convert PIL image to base64 string."""
@@ -43,10 +116,7 @@ def image_to_base64(image):
 
 
 def parse_json_response(text):
-    """Parse a JSON response from Claude, handling markdown fences and common issues.
-
-    Returns parsed dict/list, or None on failure.
-    """
+    """Parse a JSON response, handling markdown fences and common issues."""
     text = text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -60,43 +130,37 @@ def parse_json_response(text):
         return None
 
 
+# --- Slide analysis functions ---
+
 def analyze_slide_intro(base64_image):
     """Analyze an introductory slide and return a summary string."""
-    response = _ensure_client().messages.create(
-        model=MODEL_FAST,
+    return _call(
+        model=_model("fast"),
         max_tokens=1000,
         system="You are an expert at analyzing lecture slides and extracting key information concisely.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
-                {"type": "text", "text": "Analyze this introductory slide and write a 1-2 sentence overview. "
-                 "Include the topic/title and main learning objectives. "
-                 "Write in plain text only - no markdown, no bullets, no special formatting. "
-                 "Be concise and direct."}
-            ]
-        }]
+        messages=[_make_vision_message(
+            base64_image,
+            "Analyze this introductory slide and write a 1-2 sentence overview. "
+            "Include the topic/title and main learning objectives. "
+            "Write in plain text only - no markdown, no bullets, no special formatting. "
+            "Be concise and direct."
+        )]
     )
-    return response.content[0].text
 
 
 def analyze_slide_outro(base64_image):
     """Analyze a concluding slide and return a summary string."""
-    response = _ensure_client().messages.create(
-        model=MODEL_FAST,
+    return _call(
+        model=_model("fast"),
         max_tokens=1000,
         system="You are an expert at analyzing lecture slides and extracting key information concisely.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
-                {"type": "text", "text": "Analyze this concluding slide and write a 1-2 sentence summary of the key takeaways. "
-                 "Write in plain text only - no markdown, no bullets, no special formatting. "
-                 "Be concise and direct."}
-            ]
-        }]
+        messages=[_make_vision_message(
+            base64_image,
+            "Analyze this concluding slide and write a 1-2 sentence summary of the key takeaways. "
+            "Write in plain text only - no markdown, no bullets, no special formatting. "
+            "Be concise and direct."
+        )]
     )
-    return response.content[0].text
 
 
 def analyze_slide_content(base64_image, custom_instructions=""):
@@ -152,33 +216,22 @@ IMPORTANT: For open_ended questions, always include an "example_answer" field wi
     if custom_instructions:
         prompt += f"\n\nAdditional context from instructor: {custom_instructions}"
 
-    response = _ensure_client().messages.create(
-        model=MODEL_FAST,
+    response_text = _call(
+        model=_model("fast"),
         max_tokens=2500,
         system="You are an expert educator creating study guide questions from lecture slides. "
                "Generate questions that promote active learning and deep engagement with the material.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
-                {"type": "text", "text": prompt}
-            ]
-        }]
+        messages=[_make_vision_message(base64_image, prompt)]
     )
 
-    result = parse_json_response(response.content[0].text)
+    result = parse_json_response(response_text)
     if result is None:
-        return {"questions": [{"type": "open_ended", "question": response.content[0].text.strip(), "notes_prompt": "[Your notes:]"}]}
+        return {"questions": [{"type": "open_ended", "question": response_text.strip(), "notes_prompt": "[Your notes:]"}]}
     return result
 
 
 def generate_example_answers(questions_by_slide, get_base64_for_slide):
-    """Generate example answers for open-ended questions that don't have them.
-
-    Args:
-        questions_by_slide: Dict of {slide_num: [questions]}
-        get_base64_for_slide: Callable(slide_num) -> base64_image_string or None
-    """
+    """Generate example answers for open-ended questions that don't have them."""
     updated_questions = {}
 
     for slide_num, questions in questions_by_slide.items():
@@ -202,19 +255,13 @@ Write a clear, concise example answer that a student might give based on the sli
 Return ONLY the answer text, no additional formatting or explanation."""
 
                     try:
-                        response = _ensure_client().messages.create(
-                            model=MODEL_FAST,
+                        text = _call(
+                            model=_model("fast"),
                             max_tokens=500,
                             system="You are an expert educator providing model answers for study guide questions.",
-                            messages=[{
-                                "role": "user",
-                                "content": [
-                                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
-                                    {"type": "text", "text": prompt}
-                                ]
-                            }]
+                            messages=[_make_vision_message(base64_image, prompt)]
                         )
-                        updated_qs[idx]["example_answer"] = response.content[0].text.strip()
+                        updated_qs[idx]["example_answer"] = text.strip()
                     except Exception:
                         updated_qs[idx]["example_answer"] = "[Example answer not available]"
 
@@ -224,10 +271,7 @@ Return ONLY the answer text, no additional formatting or explanation."""
 
 
 def review_and_select_questions(all_questions, total_slides):
-    """Use Opus to review all questions and select the best ones for a 2-page guide.
-
-    Returns a set of (slide_num, question_index) tuples that are selected.
-    """
+    """Use the advanced model to review and select the best questions for a 2-page guide."""
     questions_summary = []
     for slide_num, qs in all_questions.items():
         for i, q in enumerate(qs):
@@ -271,31 +315,25 @@ Return ONLY valid JSON listing which questions to INCLUDE:
   ]
 }}"""
 
-    response = _ensure_client().messages.create(
-        model=MODEL_ADVANCED,
+    response_text = _call(
+        model=_model("advanced"),
         max_tokens=2000,
         system="You are reviewing questions for a student note-taking guide. "
                "The guide should be approximately 2 pages (maximum 3 pages). "
                "Select the best mix of questions for effective learning.",
-        messages=[{
-            "role": "user",
-            "content": prompt
-        }]
+        messages=[_make_text_message(prompt)]
     )
 
-    result = parse_json_response(response.content[0].text)
+    result = parse_json_response(response_text)
     if result is not None:
         selected = result.get("selected", [])
         return {(s["slide"], s["index"]) for s in selected}
 
-    # Fallback: select first question from each slide (reasonable default)
     return {(slide, 0) for slide in all_questions}
 
 
 def regenerate_questions(base64_image, slide_num, selected_types, use_advanced_model=False, custom_instructions=""):
     """Regenerate questions for a slide using only the selected question types."""
-    model = MODEL_ADVANCED if use_advanced_model else MODEL_FAST
-
     type_instructions = []
     for qtype in selected_types:
         if qtype == "open_ended":
@@ -340,20 +378,16 @@ IMPORTANT: For open_ended questions, always include an "example_answer" field wi
     if custom_instructions:
         prompt += f"\n\nAdditional context from instructor: {custom_instructions}"
 
-    response = _ensure_client().messages.create(
+    model = _model("advanced") if use_advanced_model else _model("fast")
+
+    response_text = _call(
         model=model,
         max_tokens=2500,
         system="You are an expert educator creating study guide questions from lecture slides.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}},
-                {"type": "text", "text": prompt}
-            ]
-        }]
+        messages=[_make_vision_message(base64_image, prompt)]
     )
 
-    result = parse_json_response(response.content[0].text)
+    result = parse_json_response(response_text)
     if result is None:
-        return {"questions": [{"type": "open_ended", "question": response.content[0].text.strip(), "notes_prompt": "[Your notes:]"}]}
+        return {"questions": [{"type": "open_ended", "question": response_text.strip(), "notes_prompt": "[Your notes:]"}]}
     return result

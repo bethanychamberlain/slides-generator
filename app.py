@@ -3,7 +3,6 @@ from pdf2image import convert_from_bytes
 from PIL import Image
 from pathlib import Path
 import shutil
-import anthropic
 
 from cache import (
     get_file_hash, get_image_hash, get_cached_questions_for_image,
@@ -13,7 +12,7 @@ from ai import (
     image_to_base64, analyze_slide_intro, analyze_slide_outro,
     analyze_slide_content, generate_example_answers,
     review_and_select_questions, regenerate_questions,
-    set_api_key,
+    set_provider, PROVIDER_LABELS,
 )
 from export_docx import create_docx
 from export_qti import create_canvas_qti
@@ -112,22 +111,46 @@ st.title("Slide Guide Generator")
 # --- API Key Login ---
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
+if "provider" not in st.session_state:
+    st.session_state.provider = ""
 
 if not st.session_state.api_key:
-    st.write("Enter your Anthropic API key to get started.")
-    st.caption("Get a key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)")
-    key_input = st.text_input("API Key", type="password", placeholder="sk-ant-...")
+    st.write("Choose your AI provider and enter your API key to get started.")
+
+    provider = st.radio(
+        "AI Provider",
+        options=list(PROVIDER_LABELS.keys()),
+        format_func=lambda k: PROVIDER_LABELS[k],
+        captions=[
+            "Smartest models (Sonnet + Opus)",
+            "Data stays in the EU",
+        ],
+        horizontal=True,
+    )
+
+    if provider == "anthropic":
+        st.caption("Get a key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)")
+        key_input = st.text_input("API Key", type="password", placeholder="sk-ant-...")
+    else:
+        st.caption("Get a key at [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)")
+        key_input = st.text_input("API Key", type="password", placeholder="Paste your Mistral API key...")
+
     if st.button("Start"):
-        if key_input.startswith("sk-ant-"):
-            set_api_key(key_input)
-            st.session_state.api_key = key_input
-            st.rerun()
-        else:
+        if not key_input.strip():
+            st.error("Please enter an API key.")
+        elif provider == "anthropic" and not key_input.startswith("sk-ant-"):
             st.error("That doesn't look like a valid Anthropic API key. It should start with sk-ant-")
+        elif provider == "mistral" and key_input.startswith("sk-ant-"):
+            st.error("That looks like an Anthropic key. Select Anthropic above, or enter your Mistral key.")
+        else:
+            set_provider(provider, key_input)
+            st.session_state.api_key = key_input
+            st.session_state.provider = provider
+            st.rerun()
     st.stop()
 
 # Key is set — initialize the client for this session
-set_api_key(st.session_state.api_key)
+set_provider(st.session_state.provider, st.session_state.api_key)
 
 st.write("Upload a presentation PDF to generate a student note-taking guide.")
 
@@ -299,8 +322,6 @@ if uploaded_file and not st.session_state.analyzed:
                             if b64:
                                 try:
                                     intro_texts.append(analyze_slide_intro(b64))
-                                except (anthropic.APIError, anthropic.AuthenticationError, anthropic.RateLimitError) as e:
-                                    st.warning(f"API error on intro slide {idx + 1}: {e}")
                                 except Exception as e:
                                     st.warning(f"Error on intro slide {idx + 1}: {e}")
                         st.session_state.intro_summary = "\n".join(intro_texts) if intro_texts else None
@@ -316,8 +337,6 @@ if uploaded_file and not st.session_state.analyzed:
                             if b64:
                                 try:
                                     outro_texts.append(analyze_slide_outro(b64))
-                                except (anthropic.APIError, anthropic.AuthenticationError, anthropic.RateLimitError) as e:
-                                    st.warning(f"API error on outro slide {idx + 1}: {e}")
                                 except Exception as e:
                                     st.warning(f"Error on outro slide {idx + 1}: {e}")
                         st.session_state.outro_summary = "\n".join(outro_texts) if outro_texts else None
@@ -357,16 +376,16 @@ if uploaded_file and not st.session_state.analyzed:
                                     st.session_state[f"slide_{slide_num}_q_{qi}"] = True
                                 save_questions_for_image(image_hash, questions)
                                 api_calls += 1
-                            except anthropic.RateLimitError:
-                                st.error("Rate limited by the API. Please wait 60 seconds and try again.")
-                                break
-                            except anthropic.AuthenticationError:
-                                st.error("API key is invalid or expired. Check your ANTHROPIC_API_KEY in the .env file.")
-                                break
-                            except anthropic.APIError as e:
-                                st.warning(f"API error on slide {slide_num}, skipping: {e}")
                             except Exception as e:
-                                st.warning(f"Error on slide {slide_num}, skipping: {e}")
+                                err = str(e).lower()
+                                if "rate" in err and "limit" in err:
+                                    st.error("Rate limited by the API. Please wait 60 seconds and try again.")
+                                    break
+                                elif "auth" in err or "unauthorized" in err or "invalid" in err and "key" in err:
+                                    st.error("API key is invalid or expired. Please log out and re-enter your key.")
+                                    break
+                                else:
+                                    st.warning(f"Error on slide {slide_num}, skipping: {e}")
 
                     if num_content > 0:
                         progress.progress((idx + 1) / num_content)
@@ -389,7 +408,7 @@ if uploaded_file and not st.session_state.analyzed:
 
                             selected_count = len(selected_set)
                             st.toast(f"Pre-selected {selected_count} questions for ~2 page guide")
-                        except (anthropic.APIError, Exception) as e:
+                        except Exception as e:
                             st.warning(f"Could not run AI selection: {e}. All questions selected by default.")
                             selected_set = {(sn, qi) for sn, qs in st.session_state.questions.items() for qi in range(len(qs))}
 
@@ -451,9 +470,11 @@ if st.session_state.analyzed:
         if st.button("Start Over", key="start_over_top"):
             cleanup_working_dir()
             api_key = st.session_state.api_key
+            provider = st.session_state.provider
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.session_state.api_key = api_key
+            st.session_state.provider = provider
             st.rerun()
 
     # Show intro summary
@@ -797,10 +818,12 @@ if st.session_state.analyzed:
     with reset_col1:
         if st.button("Start Over"):
             cleanup_working_dir()
-            api_key = st.session_state.api_key  # preserve login
+            api_key = st.session_state.api_key
+            provider = st.session_state.provider
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.session_state.api_key = api_key
+            st.session_state.provider = provider
             st.rerun()
     with reset_col2:
         if st.button("Log Out"):

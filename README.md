@@ -1,6 +1,6 @@
 # Slide Guide Generator
 
-Convert PDF slide decks into AI-generated student study guides using Claude.
+Convert PDF slide decks into AI-generated student study guides using Claude or Mistral AI.
 
 Upload a PDF, configure which slides are intro/content/conclusion, and the app generates structured questions (open-ended, short answer, fill-in-the-blank, true/false, multiple choice, ordering). An advanced AI model reviews and selects the best questions for a ~2 page guide. Export as student DOCX, teacher answer key, or Canvas LMS quiz.
 
@@ -44,12 +44,10 @@ pip install -r requirements.txt
 
 ### 4. API key
 
-Create a `.env` file in the project folder:
-```
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-```
+Each user enters their own API key on the login screen. Choose a provider:
 
-Get a key at https://console.anthropic.com/settings/keys
+- **Anthropic (Claude)** — smartest models. Get a key at https://console.anthropic.com/settings/keys
+- **Mistral AI** — data stays in the EU. Get a key at https://console.mistral.ai/api-keys
 
 ### 5. Run
 
@@ -99,7 +97,7 @@ Use `pythonw.exe` (not `python.exe`) so no console window appears.
 
 ```
 app.py           Streamlit UI
-ai.py            Claude API calls and prompts
+ai.py            AI API calls and prompts (Anthropic + Mistral)
 cache.py         File and slide caching
 questions.py     Question types, formatting, CSV
 export_docx.py   Word document generation
