@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - An Azure account (your organization likely has one — check with IT)
-- Azure CLI installed: `winget install Microsoft.AzureCLI` (Windows) or `brew install azure-cli` (macOS)
+- Azure CLI installed: `curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash` (Linux) or `winget install Microsoft.AzureCLI` (Windows) or `brew install azure-cli` (macOS)
 - Logged in: `az login`
 
 ## Quick Start (5 minutes)

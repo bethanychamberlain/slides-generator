@@ -1,5 +1,10 @@
 import streamlit as st
-from pdf2image import convert_from_bytes
+import pypdfium2 as pdfium
+try:
+    from pdf2image import convert_from_bytes
+    _HAS_PDF2IMAGE = True
+except ImportError:
+    _HAS_PDF2IMAGE = False
 from PIL import Image
 from pathlib import Path
 import shutil
@@ -31,6 +36,12 @@ MAX_FILE_SIZE_MB = 50
 
 # Working directory for full-size images
 WORKING_IMAGES_DIR = Path(__file__).parent / "working_images"
+
+
+def convert_pdf_to_images(file_bytes, dpi=IMAGE_DPI):
+    """Convert PDF bytes to a list of PIL Images. Uses pypdfium2 (no system deps)."""
+    pdf = pdfium.PdfDocument(file_bytes)
+    return [pdf[i].render(scale=dpi / 72).to_pil() for i in range(len(pdf))]
 
 
 def ensure_working_dir():
@@ -196,9 +207,9 @@ if uploaded_file and not st.session_state.analyzed:
                     with st.spinner("Loading cached results..."):
                         cleanup_working_dir()
                         try:
-                            images = convert_from_bytes(file_bytes, dpi=IMAGE_DPI)
+                            images = convert_pdf_to_images(file_bytes)
                         except Exception as e:
-                            st.error(f"Failed to convert PDF: {e}. The file may be corrupted, password-protected, or poppler may not be installed.")
+                            st.error(f"Failed to convert PDF: {e}. The file may be corrupted or password-protected.")
                             st.stop()
                         for idx, img in enumerate(images):
                             save_slide_image(img, idx + 1)
@@ -229,9 +240,9 @@ if uploaded_file and not st.session_state.analyzed:
             # PDF preview before analysis
             with st.spinner("Converting PDF for preview..."):
                 try:
-                    preview_images = convert_from_bytes(file_bytes, dpi=IMAGE_DPI)
+                    preview_images = convert_pdf_to_images(file_bytes)
                 except Exception as e:
-                    st.error(f"Failed to convert PDF: {e}. The file may be corrupted, password-protected, or poppler may not be installed.")
+                    st.error(f"Failed to convert PDF: {e}. The file may be corrupted or password-protected.")
                     st.stop()
 
                 cleanup_working_dir()
