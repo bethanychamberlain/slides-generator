@@ -149,7 +149,7 @@ def _load_user_profiles():
         try:
             with open(USERS_FILE, "r") as f:
                 profiles = json.load(f)
-            return [p for p in profiles if p.get("name") and p.get("api_key")]
+            return [p for p in profiles if p.get("name") and p.get("keys")]
         except (json.JSONDecodeError, TypeError):
             return []
     return []
@@ -167,23 +167,41 @@ if not st.session_state.api_key:
 
     if profiles:
         st.write("Welcome! Select your name to get started.")
-        profile_labels = [
-            f"{p['name']}  —  {PROVIDER_LABELS.get(p['provider'], p['provider'])}"
-            for p in profiles
-        ] + ["Other (enter key manually)"]
-        selected = st.selectbox("Who are you?", profile_labels, key="login_select")
+        profile_names = [p["name"] for p in profiles] + ["Other (enter key manually)"]
+        selected = st.selectbox("Who are you?", profile_names, key="login_select")
 
         if selected == "Other (enter key manually)":
             # Fall through to manual entry below
             profiles = []
         else:
-            profile = next(p for p in profiles if selected.startswith(p["name"]))
+            profile = next(p for p in profiles if p["name"] == selected)
+            password = st.text_input("Password", type="password", key="login_password")
+
+            # Show provider choice based on which keys this person has
+            available = {k: v for k, v in profile["keys"].items() if v}
+            if len(available) > 1:
+                provider = st.radio(
+                    "AI Provider",
+                    options=list(available.keys()),
+                    format_func=lambda k: PROVIDER_LABELS.get(k, k),
+                    horizontal=True,
+                    key="login_provider",
+                )
+            else:
+                provider = list(available.keys())[0]
+                st.caption(f"Provider: {PROVIDER_LABELS.get(provider, provider)}")
+
             if st.button("Start"):
-                set_provider(profile["provider"], profile["api_key"])
-                st.session_state.api_key = profile["api_key"]
-                st.session_state.provider = profile["provider"]
-                st.session_state.user_name = profile["name"]
-                st.rerun()
+                expected = profile.get("password", "")
+                if expected and password != expected:
+                    st.error("Incorrect password.")
+                else:
+                    api_key = available[provider]
+                    set_provider(provider, api_key)
+                    st.session_state.api_key = api_key
+                    st.session_state.provider = provider
+                    st.session_state.user_name = profile["name"]
+                    st.rerun()
             st.stop()
 
     if not profiles:
