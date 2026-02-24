@@ -3,6 +3,34 @@
 from io import BytesIO
 from fpdf import FPDF
 
+# Common Unicode -> ASCII replacements for latin-1 safe output
+_UNICODE_MAP = str.maketrans({
+    "\u2013": "-",    # en dash
+    "\u2014": "--",   # em dash
+    "\u2018": "'",    # left single quote
+    "\u2019": "'",    # right single quote
+    "\u201c": '"',    # left double quote
+    "\u201d": '"',    # right double quote
+    "\u2026": "...",  # ellipsis
+    "\u2022": "*",    # bullet
+    "\u25cb": "( )",  # white circle
+    "\u25cf": "(X)",  # black circle
+    "\u2192": "->",   # right arrow
+    "\u2190": "<-",   # left arrow
+    "\u2264": "<=",   # less than or equal
+    "\u2265": ">=",   # greater than or equal
+    "\u00a0": " ",    # non-breaking space
+})
+
+
+def _safe(text):
+    """Make text safe for fpdf2 core fonts (latin-1 only)."""
+    if not text:
+        return ""
+    text = text.translate(_UNICODE_MAP)
+    # Strip any remaining non-latin-1 characters
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
 
 class _GuidePDF(FPDF):
     """Thin FPDF subclass with Times New Roman defaults and narrow margins."""
@@ -13,6 +41,10 @@ class _GuidePDF(FPDF):
         self.set_margins(left=13, top=13, right=13)
         self.add_page()
         self.set_font("Times", size=10)
+
+    def write(self, h, text="", link=""):
+        """Override write to sanitize Unicode for core fonts."""
+        super().write(h, _safe(text), link)
 
     # Helpers ---------------------------------------------------------------
 
