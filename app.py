@@ -41,7 +41,13 @@ WORKING_IMAGES_DIR = Path(__file__).parent / "working_images"
 def convert_pdf_to_images(file_bytes, dpi=IMAGE_DPI):
     """Convert PDF bytes to a list of PIL Images. Uses pypdfium2 (no system deps)."""
     pdf = pdfium.PdfDocument(file_bytes)
-    return [pdf[i].render(scale=dpi / 72).to_pil() for i in range(len(pdf))]
+    images = []
+    for i in range(len(pdf)):
+        img = pdf[i].render(scale=dpi / 72).to_pil()
+        if img.mode == "RGBA":
+            img = img.convert("RGB")
+        images.append(img)
+    return images
 
 
 def ensure_working_dir():

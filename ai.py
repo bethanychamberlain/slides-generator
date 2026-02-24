@@ -118,16 +118,41 @@ def image_to_base64(image):
 def parse_json_response(text):
     """Parse a JSON response, handling markdown fences and common issues."""
     text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
 
+    # Extract from code fence anywhere in the response
+    if "```" in text:
+        parts = text.split("```")
+        for part in parts[1::2]:  # odd-indexed parts are inside fences
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            try:
+                return json.loads(part)
+            except json.JSONDecodeError:
+                continue
+
+    # Try parsing the raw text directly
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        return None
+        pass
+
+    # Last resort: find the first { ... } block
+    start = text.find("{")
+    if start != -1:
+        # Find matching closing brace
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except json.JSONDecodeError:
+                        return None
+    return None
 
 
 # --- Slide analysis functions ---
