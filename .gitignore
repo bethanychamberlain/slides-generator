@@ -1,6 +1,7 @@
 # Environment
 .env
 venv/
+users.json
 
 # Python
 __pycache__/
