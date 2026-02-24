@@ -21,6 +21,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# --- Free the port if something else is using it ---
+EXISTING_PID=$(lsof -ti :"$PORT" 2>/dev/null || true)
+if [[ -n "$EXISTING_PID" ]]; then
+    echo "Port $PORT in use (PID $EXISTING_PID) — stopping it..."
+    kill "$EXISTING_PID" 2>/dev/null
+    sleep 1
+fi
+
 # --- Start Streamlit ---
 echo "Starting Streamlit on port $PORT..."
 "$STREAMLIT" run "$DIR/app.py" \
@@ -30,9 +38,9 @@ echo "Starting Streamlit on port $PORT..."
 STREAMLIT_PID=$!
 sleep 2
 
-# --- Start Dev Tunnel ---
+# --- Start Dev Tunnel (port is already configured on the tunnel) ---
 echo "Starting dev tunnel ($TUNNEL_ID)..."
-"$DEVTUNNEL" host "$TUNNEL_ID" --port-numbers "$PORT" &
+"$DEVTUNNEL" host "$TUNNEL_ID" &
 TUNNEL_PID=$!
 sleep 3
 
