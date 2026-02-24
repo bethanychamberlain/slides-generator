@@ -21,6 +21,7 @@ from ai import (
 )
 from export_docx import create_docx
 from export_pdf import create_pdf
+from export_html import create_html
 from export_qti import create_canvas_qti
 from questions import (
     QUESTION_TYPES, QUESTION_TYPE_LABELS, format_question_display,
@@ -98,11 +99,13 @@ def toggle_slide_selection(slide_num, select_all):
     for qi in range(len(qs)):
         st.session_state[f"slide_{slide_num}_q_{qi}"] = select_all
     st.session_state.user_modified_selection = True
+    st.session_state.teacher_questions = None
 
 
 def on_checkbox_change():
     """Callback when user manually changes a checkbox."""
     st.session_state.user_modified_selection = True
+    st.session_state.teacher_questions = None
 
 
 def toggle_all_selection(select_all):
@@ -111,6 +114,7 @@ def toggle_all_selection(select_all):
         for qi in range(len(st.session_state.questions[sn])):
             st.session_state[f"slide_{sn}_q_{qi}"] = select_all
     st.session_state.user_modified_selection = True
+    st.session_state.teacher_questions = None
 
 
 def clean_slide_question_keys(slide_num, old_count):
@@ -657,6 +661,7 @@ if st.session_state.analyzed:
                                     for qi in range(len(new_questions)):
                                         st.session_state[f"slide_{slide_num}_q_{qi}"] = True
                                     st.session_state[regen_key] = False
+                                    st.session_state.teacher_questions = None
 
                                     save_questions_to_csv(
                                         {slide_num: new_questions},
@@ -728,75 +733,102 @@ if st.session_state.analyzed:
 
     fmt_col, spacer_col = st.columns([1, 3])
     with fmt_col:
-        export_format = st.selectbox("Export format", ["Word (.docx)", "PDF (.pdf)"], key="export_format")
+        export_format = st.selectbox(
+            "Export format",
+            ["Word (.docx)", "PDF (.pdf)", "HTML (.html)"],
+            key="export_format",
+        )
 
-    # Prepare teacher questions (shared by both formats)
+    # --- Student downloads (always available — no AI calls) ---
+    st.markdown("**Student Version**")
+    stu_col1, stu_col2, stu_col3 = st.columns(3)
+    with stu_col1:
+        student_docx = create_docx(export_intro, final_questions, export_outro, show_answers=False)
+        st.download_button(
+            "Student (.docx)", student_docx,
+            "note_guide_student.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    with stu_col2:
+        student_pdf = create_pdf(export_intro, final_questions, export_outro, show_answers=False)
+        st.download_button(
+            "Student (.pdf)", student_pdf,
+            "note_guide_student.pdf", "application/pdf",
+        )
+    with stu_col3:
+        student_html = create_html(export_intro, final_questions, export_outro, show_answers=False)
+        st.download_button(
+            "Student (.html)", student_html,
+            "note_guide_student.html", "text/html",
+        )
+
+    # --- Teacher guide (on-demand) ---
+    st.markdown("**Teacher Answer Key**")
+
+    # Initialize teacher_questions in session state
+    if "teacher_questions" not in st.session_state:
+        st.session_state.teacher_questions = None
+
+    # Check if example answers are already present for all open-ended questions
     needs_examples = any(
         q.get("type") == "open_ended" and not q.get("example_answer")
         for qs in final_questions.values()
         for q in qs
     )
-    if needs_examples:
-        with st.spinner("Generating example answers for teacher guide..."):
-            teacher_questions = generate_example_answers(
-                final_questions,
-                get_base64_for_slide
-            )
-            save_questions_to_csv(
-                teacher_questions,
-                st.session_state.get("source_filename", "unknown"),
-                None
-            )
+
+    if needs_examples and st.session_state.teacher_questions is None:
+        if st.button("Generate Teacher Guide", help="Generates example answers for open-ended questions (requires AI calls)"):
+            with st.spinner("Generating example answers for teacher guide..."):
+                teacher_questions = generate_example_answers(
+                    final_questions,
+                    get_base64_for_slide
+                )
+                save_questions_to_csv(
+                    teacher_questions,
+                    st.session_state.get("source_filename", "unknown"),
+                    None
+                )
+                st.session_state.teacher_questions = teacher_questions
+            st.rerun()
+        else:
+            st.caption("Click the button above to generate example answers before downloading the teacher version.")
     else:
-        teacher_questions = final_questions
+        # Either all answers exist already, or we generated them previously
+        teacher_questions = st.session_state.teacher_questions if st.session_state.teacher_questions is not None else final_questions
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    if export_format == "Word (.docx)":
-        with col1:
-            student_docx = create_docx(export_intro, final_questions, export_outro, show_answers=False)
-            st.download_button(
-                "Student Version (.docx)",
-                student_docx,
-                "note_guide_student.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            )
-        with col2:
+        tea_col1, tea_col2, tea_col3 = st.columns(3)
+        with tea_col1:
             teacher_docx = create_docx(export_intro, teacher_questions, export_outro, show_answers=True)
             st.download_button(
-                "Teacher Answer Key (.docx)",
-                teacher_docx,
+                "Teacher (.docx)", teacher_docx,
                 "note_guide_teacher.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
-    else:
-        with col1:
-            student_pdf = create_pdf(export_intro, final_questions, export_outro, show_answers=False)
-            st.download_button(
-                "Student Version (.pdf)",
-                student_pdf,
-                "note_guide_student.pdf",
-                "application/pdf",
-            )
-        with col2:
+        with tea_col2:
             teacher_pdf = create_pdf(export_intro, teacher_questions, export_outro, show_answers=True)
             st.download_button(
-                "Teacher Answer Key (.pdf)",
-                teacher_pdf,
-                "note_guide_teacher.pdf",
-                "application/pdf",
+                "Teacher (.pdf)", teacher_pdf,
+                "note_guide_teacher.pdf", "application/pdf",
+            )
+        with tea_col3:
+            teacher_html = create_html(export_intro, teacher_questions, export_outro, show_answers=True)
+            st.download_button(
+                "Teacher (.html)", teacher_html,
+                "note_guide_teacher.html", "text/html",
             )
 
-    with col3:
+    # Utility buttons
+    util_col1, util_col2 = st.columns(2)
+    with util_col1:
         if st.button("Clean up images"):
             cleanup_working_dir()
             st.success("Working images cleaned up!")
-
-    with col4:
+    with util_col2:
         if st.button("Clear analysis cache"):
             clear_cache()
             st.session_state.analyzed = False
             st.session_state.questions = {}
+            st.session_state.teacher_questions = None
             st.success("Analysis cache cleared! Please re-analyze to use updated question generation.")
             st.rerun()
 

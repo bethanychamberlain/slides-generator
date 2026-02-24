@@ -1,6 +1,7 @@
 """AI API calls and prompt logic. Supports Anthropic (Claude) and Mistral."""
 
 import json
+import re
 import base64
 from io import BytesIO
 
@@ -115,6 +116,35 @@ def image_to_base64(image):
     return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
 
 
+def _repair_json_string(text):
+    """Fix common AI JSON issues: unescaped control chars inside strings, trailing commas."""
+    # Character-by-character: replace literal control chars only inside JSON strings
+    result = []
+    in_string = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_string = not in_string
+            result.append(ch)
+        elif in_string:
+            if ch == '\n':
+                result.append('\\n')
+            elif ch == '\r':
+                result.append('\\r')
+            elif ch == '\t':
+                result.append('\\t')
+            else:
+                result.append(ch)
+        else:
+            result.append(ch)
+        i += 1
+    repaired = ''.join(result)
+    # Remove trailing commas before } or ] (another common AI JSON issue)
+    repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+    return repaired
+
+
 def parse_json_response(text):
     """Parse a JSON response, handling markdown fences and common issues."""
     text = text.strip()
@@ -129,13 +159,19 @@ def parse_json_response(text):
             try:
                 return json.loads(part)
             except json.JSONDecodeError:
-                continue
+                try:
+                    return json.loads(_repair_json_string(part))
+                except json.JSONDecodeError:
+                    continue
 
     # Try parsing the raw text directly
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        pass
+        try:
+            return json.loads(_repair_json_string(text))
+        except json.JSONDecodeError:
+            pass
 
     # Last resort: find the first { ... } block
     start = text.find("{")
@@ -148,10 +184,14 @@ def parse_json_response(text):
             elif text[i] == "}":
                 depth -= 1
                 if depth == 0:
+                    block = text[start:i + 1]
                     try:
-                        return json.loads(text[start:i + 1])
+                        return json.loads(block)
                     except json.JSONDecodeError:
-                        return None
+                        try:
+                            return json.loads(_repair_json_string(block))
+                        except json.JSONDecodeError:
+                            return None
     return None
 
 
