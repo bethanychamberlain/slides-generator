@@ -167,14 +167,17 @@ if not st.session_state.api_key:
 
     if profiles:
         st.write("Welcome! Select your name to get started.")
-        profile_names = [p["name"] for p in profiles] + ["Other (enter key manually)"]
-        selected = st.selectbox("Who are you?", profile_names, key="login_select")
+        profile_labels = [
+            f"{p['name']}  —  {PROVIDER_LABELS.get(p['provider'], p['provider'])}"
+            for p in profiles
+        ] + ["Other (enter key manually)"]
+        selected = st.selectbox("Who are you?", profile_labels, key="login_select")
 
         if selected == "Other (enter key manually)":
             # Fall through to manual entry below
             profiles = []
         else:
-            profile = next(p for p in profiles if p["name"] == selected)
+            profile = next(p for p in profiles if selected.startswith(p["name"]))
             if st.button("Start"):
                 set_provider(profile["provider"], profile["api_key"])
                 st.session_state.api_key = profile["api_key"]
