@@ -42,9 +42,9 @@ class _GuidePDF(FPDF):
         self.add_page()
         self.set_font("Times", size=10)
 
-    def write(self, h, text="", link=""):
-        """Override write to sanitize Unicode for core fonts."""
-        super().write(h, _safe(text), link)
+    def normalize_text(self, text):
+        """Sanitize Unicode before fpdf2 encodes to latin-1."""
+        return super().normalize_text(_safe(text))
 
     # Helpers ---------------------------------------------------------------
 

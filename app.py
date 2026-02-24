@@ -689,7 +689,7 @@ if st.session_state.analyzed:
             with st.popover("View Full Size Slide"):
                 image_path = get_slide_image_path(slide_num)
                 if image_path.exists():
-                    st.image(str(image_path), use_container_width=True)
+                    st.image(str(image_path), width="stretch")
 
             st.markdown("---")
 
