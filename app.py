@@ -20,6 +20,7 @@ from ai import (
     set_provider, PROVIDER_LABELS,
 )
 from export_docx import create_docx
+from export_pdf import create_pdf
 from export_qti import create_canvas_qti
 from questions import (
     QUESTION_TYPES, QUESTION_TYPE_LABELS, format_question_display,
@@ -725,55 +726,66 @@ if st.session_state.analyzed:
     export_intro = st.session_state.get("intro_summary") if st.session_state.include_intro else None
     export_outro = st.session_state.get("outro_summary") if st.session_state.include_outro else None
 
+    fmt_col, spacer_col = st.columns([1, 3])
+    with fmt_col:
+        export_format = st.selectbox("Export format", ["Word (.docx)", "PDF (.pdf)"], key="export_format")
+
+    # Prepare teacher questions (shared by both formats)
+    needs_examples = any(
+        q.get("type") == "open_ended" and not q.get("example_answer")
+        for qs in final_questions.values()
+        for q in qs
+    )
+    if needs_examples:
+        with st.spinner("Generating example answers for teacher guide..."):
+            teacher_questions = generate_example_answers(
+                final_questions,
+                get_base64_for_slide
+            )
+            save_questions_to_csv(
+                teacher_questions,
+                st.session_state.get("source_filename", "unknown"),
+                None
+            )
+    else:
+        teacher_questions = final_questions
+
     col1, col2, col3, col4 = st.columns(4)
 
-    with col1:
-        student_docx = create_docx(
-            export_intro,
-            final_questions,
-            export_outro,
-            show_answers=False
-        )
-        st.download_button(
-            "Student Version",
-            student_docx,
-            "note_guide_student.docx",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-
-    with col2:
-        needs_examples = any(
-            q.get("type") == "open_ended" and not q.get("example_answer")
-            for qs in final_questions.values()
-            for q in qs
-        )
-
-        if needs_examples:
-            with st.spinner("Generating example answers for teacher guide..."):
-                teacher_questions = generate_example_answers(
-                    final_questions,
-                    get_base64_for_slide
-                )
-                save_questions_to_csv(
-                    teacher_questions,
-                    st.session_state.get("source_filename", "unknown"),
-                    None
-                )
-        else:
-            teacher_questions = final_questions
-
-        teacher_docx = create_docx(
-            export_intro,
-            teacher_questions,
-            export_outro,
-            show_answers=True
-        )
-        st.download_button(
-            "Teacher Answer Key",
-            teacher_docx,
-            "note_guide_teacher.docx",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+    if export_format == "Word (.docx)":
+        with col1:
+            student_docx = create_docx(export_intro, final_questions, export_outro, show_answers=False)
+            st.download_button(
+                "Student Version (.docx)",
+                student_docx,
+                "note_guide_student.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        with col2:
+            teacher_docx = create_docx(export_intro, teacher_questions, export_outro, show_answers=True)
+            st.download_button(
+                "Teacher Answer Key (.docx)",
+                teacher_docx,
+                "note_guide_teacher.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+    else:
+        with col1:
+            student_pdf = create_pdf(export_intro, final_questions, export_outro, show_answers=False)
+            st.download_button(
+                "Student Version (.pdf)",
+                student_pdf,
+                "note_guide_student.pdf",
+                "application/pdf",
+            )
+        with col2:
+            teacher_pdf = create_pdf(export_intro, teacher_questions, export_outro, show_answers=True)
+            st.download_button(
+                "Teacher Answer Key (.pdf)",
+                teacher_pdf,
+                "note_guide_teacher.pdf",
+                "application/pdf",
+            )
 
     with col3:
         if st.button("Clean up images"):
