@@ -8,6 +8,7 @@ except ImportError:
 from PIL import Image
 from pathlib import Path
 import shutil
+import uuid
 
 from cache import (
     get_file_hash, get_image_hash, get_cached_questions_for_image,
@@ -36,8 +37,15 @@ DEFAULT_INTRO_SLIDES = 3
 DEFAULT_OUTRO_SLIDES = 3
 MAX_FILE_SIZE_MB = 50
 
-# Working directory for full-size images
-WORKING_IMAGES_DIR = Path(__file__).parent / "working_images"
+# Working directory for full-size images (parent; each session gets a subdirectory)
+WORKING_IMAGES_BASE = Path(__file__).parent / "working_images"
+
+
+def _session_working_dir():
+    """Return the per-session working directory (created lazily)."""
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = uuid.uuid4().hex[:12]
+    return WORKING_IMAGES_BASE / st.session_state.session_id
 
 
 def convert_pdf_to_images(file_bytes, dpi=IMAGE_DPI):
@@ -53,28 +61,29 @@ def convert_pdf_to_images(file_bytes, dpi=IMAGE_DPI):
 
 
 def ensure_working_dir():
-    """Create working images directory if it doesn't exist."""
-    WORKING_IMAGES_DIR.mkdir(exist_ok=True)
+    """Create the per-session working images directory if it doesn't exist."""
+    _session_working_dir().mkdir(parents=True, exist_ok=True)
 
 
 def cleanup_working_dir():
-    """Remove all images from working directory."""
-    if WORKING_IMAGES_DIR.exists():
-        shutil.rmtree(WORKING_IMAGES_DIR)
-    WORKING_IMAGES_DIR.mkdir(exist_ok=True)
+    """Remove all images from the current session's working directory."""
+    d = _session_working_dir()
+    if d.exists():
+        shutil.rmtree(d)
+    d.mkdir(parents=True, exist_ok=True)
 
 
 def save_slide_image(image, slide_num):
-    """Save a slide image to the working directory."""
+    """Save a slide image to the session's working directory."""
     ensure_working_dir()
-    filename = WORKING_IMAGES_DIR / f"slide_{slide_num:03d}.jpg"
+    filename = _session_working_dir() / f"slide_{slide_num:03d}.jpg"
     image.save(filename, format="JPEG", quality=95)
     return filename
 
 
 def get_slide_image_path(slide_num):
-    """Get the path to a saved slide image."""
-    return WORKING_IMAGES_DIR / f"slide_{slide_num:03d}.jpg"
+    """Get the path to a saved slide image in the current session."""
+    return _session_working_dir() / f"slide_{slide_num:03d}.jpg"
 
 
 def load_slide_image(slide_num):
