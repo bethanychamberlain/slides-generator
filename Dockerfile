@@ -16,8 +16,12 @@ COPY app.py ai.py auth.py cache.py questions.py usage_logger.py \
      export_docx.py export_pdf.py export_html.py export_qti.py \
      icon.png ./
 
-# Create data directory for volume mount
-RUN mkdir -p /data
+# Create non-root user and data directory
+RUN useradd --create-home appuser && \
+    mkdir -p /data && \
+    chown appuser:appuser /data
+
+USER appuser
 
 # Streamlit configuration
 ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \

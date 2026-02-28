@@ -470,12 +470,11 @@ if st.session_state.analyzed:
     with top_col3:
         if st.button("Start Over", key="start_over_top"):
             cleanup_working_dir()
-            api_key = st.session_state.api_key
-            provider = st.session_state.provider
+            user = st.session_state.get("user")
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
-            st.session_state.api_key = api_key
-            st.session_state.provider = provider
+            if user:
+                st.session_state["user"] = user
             st.rerun()
 
     # Show intro summary
@@ -858,12 +857,11 @@ if st.session_state.analyzed:
     with reset_col1:
         if st.button("Start Over"):
             cleanup_working_dir()
-            api_key = st.session_state.api_key
-            provider = st.session_state.provider
+            user = st.session_state.get("user")
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
-            st.session_state.api_key = api_key
-            st.session_state.provider = provider
+            if user:
+                st.session_state["user"] = user
             st.rerun()
     with reset_col2:
         if st.button("Log Out"):
