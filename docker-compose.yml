@@ -1,0 +1,29 @@
+services:
+  slide-guide:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - slide-guide-data:/data
+    environment:
+      # Required: AI provider API key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env or environment}
+      # Required: Azure Entra ID app registration
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_REDIRECT_URI=${AZURE_REDIRECT_URI:-http://localhost:8501}
+    restart: unless-stopped
+    # Resource limits (recommended for production)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+volumes:
+  slide-guide-data:
+    driver: local

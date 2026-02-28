@@ -1,0 +1,43 @@
+# Version control
+.git/
+.gitignore
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment and secrets
+.env
+users.json
+
+# Generated data (lives on volumes, not in image)
+working_images/
+analysis_cache/
+usage_logs/
+questions_history.csv
+
+# Development tooling
+.claude/
+.serena/
+.devcontainer/
+.azure/
+.deployment
+
+# Documentation (not needed at runtime)
+docs/
+*.md
+!requirements.txt
+
+# Desktop-only files
+tray.py
+requirements-desktop.txt
+start-beta.sh
+startup.sh
+*.desktop
+icon_stopped.png
+
+# Testing artifacts
+Testing logs from bethany/
+2026-*.txt
