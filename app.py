@@ -19,8 +19,9 @@ from ai import (
     image_to_base64, analyze_slide_intro, analyze_slide_outro,
     analyze_slide_content, generate_example_answers,
     review_and_select_questions, regenerate_questions,
-    set_provider, PROVIDER_LABELS,
+    set_provider, set_current_user,
 )
+from auth import require_login, logout
 from export_docx import create_docx
 from export_pdf import create_pdf
 from export_html import create_html
@@ -140,108 +141,17 @@ def clean_slide_question_keys(slide_num, old_count):
 st.set_page_config(page_title="Slide Guide Generator", layout="wide")
 st.title("Slide Guide Generator")
 
-# --- Load user profiles ---
-USERS_FILE = Path(__file__).parent / "users.json"
+# --- Authentication ---
+user = require_login()
+set_provider("anthropic")
+set_current_user(user["email"])
 
-def _load_user_profiles():
-    """Load faculty profiles from users.json. Returns list of dicts or empty list."""
-    if USERS_FILE.exists():
-        try:
-            with open(USERS_FILE, "r") as f:
-                profiles = json.load(f)
-            return [p for p in profiles if p.get("name") and p.get("keys")]
-        except (json.JSONDecodeError, TypeError):
-            return []
-    return []
-
-# --- API Key Login ---
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-if "provider" not in st.session_state:
-    st.session_state.provider = ""
-if "user_name" not in st.session_state:
-    st.session_state.user_name = ""
-
-if not st.session_state.api_key:
-    profiles = _load_user_profiles()
-
-    if profiles:
-        st.write("Welcome! Select your name to get started.")
-        profile_names = [p["name"] for p in profiles] + ["Other (enter key manually)"]
-        selected = st.selectbox("Who are you?", profile_names, key="login_select")
-
-        if selected == "Other (enter key manually)":
-            # Fall through to manual entry below
-            profiles = []
-        else:
-            profile = next(p for p in profiles if p["name"] == selected)
-            password = st.text_input("Password", type="password", key="login_password")
-
-            # Show provider choice based on which keys this person has
-            available = {k: v for k, v in profile["keys"].items() if v}
-            if len(available) > 1:
-                provider = st.radio(
-                    "AI Provider",
-                    options=list(available.keys()),
-                    format_func=lambda k: PROVIDER_LABELS.get(k, k),
-                    horizontal=True,
-                    key="login_provider",
-                )
-            else:
-                provider = list(available.keys())[0]
-                st.caption(f"Provider: {PROVIDER_LABELS.get(provider, provider)}")
-
-            if st.button("Start"):
-                expected = profile.get("password", "")
-                if expected and password != expected:
-                    st.error("Incorrect password.")
-                else:
-                    api_key = available[provider]
-                    set_provider(provider, api_key)
-                    st.session_state.api_key = api_key
-                    st.session_state.provider = provider
-                    st.session_state.user_name = profile["name"]
-                    st.rerun()
-            st.stop()
-
-    if not profiles:
-        st.write("Choose your AI provider and enter your API key to get started.")
-
-        provider = st.radio(
-            "AI Provider",
-            options=list(PROVIDER_LABELS.keys()),
-            format_func=lambda k: PROVIDER_LABELS[k],
-            captions=[
-                "Smartest models (Sonnet + Opus)",
-                "Data stays in the EU",
-            ],
-            horizontal=True,
-        )
-
-        if provider == "anthropic":
-            st.caption("Get a key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)")
-            key_input = st.text_input("API Key", type="password", placeholder="sk-ant-...")
-        else:
-            st.caption("Get a key at [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)")
-            key_input = st.text_input("API Key", type="password", placeholder="Paste your Mistral API key...")
-
-        if st.button("Start"):
-            if not key_input.strip():
-                st.error("Please enter an API key.")
-            elif provider == "anthropic" and not key_input.startswith("sk-ant-"):
-                st.error("That doesn't look like a valid Anthropic API key. It should start with sk-ant-")
-            elif provider == "mistral" and key_input.startswith("sk-ant-"):
-                st.error("That looks like an Anthropic key. Select Anthropic above, or enter your Mistral key.")
-            else:
-                set_provider(provider, key_input)
-                st.session_state.api_key = key_input
-                st.session_state.provider = provider
-                st.session_state.user_name = "Manual"
-                st.rerun()
-        st.stop()
-
-# Key is set — initialize the client for this session
-set_provider(st.session_state.provider, st.session_state.api_key)
+# Show user info + logout in sidebar
+with st.sidebar:
+    st.write(f"Signed in as **{user['name']}**")
+    st.caption(user["email"])
+    if st.button("Sign out"):
+        logout()
 
 st.write("Upload a presentation PDF to generate a student note-taking guide.")
 
