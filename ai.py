@@ -8,6 +8,7 @@ from io import BytesIO
 from dotenv import load_dotenv
 
 from questions import get_question_text
+from usage_logger import log_usage
 
 # Load environment variables from .env file
 load_dotenv(override=True)
@@ -16,6 +17,7 @@ load_dotenv(override=True)
 # Supported: "anthropic", "mistral"
 _provider = None
 _client = None
+_current_user = "anonymous"
 
 # Model IDs per provider
 MODELS = {
@@ -29,18 +31,24 @@ PROVIDER_LABELS = {
 }
 
 
-def set_provider(provider, api_key):
+def set_provider(provider, api_key=None):
     """Set the AI provider and API key. Called from the UI login screen."""
     global _provider, _client
     _provider = provider
     if provider == "anthropic":
         from anthropic import Anthropic
-        _client = Anthropic(api_key=api_key)
+        _client = Anthropic(api_key=api_key) if api_key else Anthropic()
     elif provider == "mistral":
         from mistralai import Mistral
-        _client = Mistral(api_key=api_key)
+        _client = Mistral(api_key=api_key) if api_key else Mistral()
     else:
         raise ValueError(f"Unknown provider: {provider}")
+
+
+def set_current_user(email):
+    """Set the current user for usage logging. Called after authentication."""
+    global _current_user
+    _current_user = email
 
 
 def _ensure_client():
@@ -84,7 +92,7 @@ def _make_text_message(text):
 
 
 def _call(model, max_tokens, system, messages):
-    """Unified API call that dispatches to the correct provider."""
+    """Unified API call with usage logging."""
     client = _ensure_client()
 
     if _provider == "anthropic":
@@ -94,15 +102,28 @@ def _call(model, max_tokens, system, messages):
             system=system,
             messages=messages,
         )
+        log_usage(
+            user_email=_current_user,
+            action="api_call",
+            model=model,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
         return response.content[0].text
 
     else:  # mistral
-        # Mistral uses a system message in the messages array
         full_messages = [{"role": "system", "content": system}] + messages
         response = client.chat.complete(
             model=model,
             max_tokens=max_tokens,
             messages=full_messages,
+        )
+        log_usage(
+            user_email=_current_user,
+            action="api_call",
+            model=model,
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
         )
         return response.choices[0].message.content
 
