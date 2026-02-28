@@ -91,24 +91,38 @@ def _dev_fallback():
     st.caption("No Azure Entra ID configured. Enter your name to continue.")
     name = st.text_input("Your name", key="dev_name")
 
-    # Allow manual API key entry if no ANTHROPIC_API_KEY in environment
-    api_key_from_env = os.environ.get("ANTHROPIC_API_KEY", "")
-    if api_key_from_env:
-        st.caption("Using API key from environment variable.")
-        api_key = ""
+    # Show key fields only for providers missing an env var
+    api_keys = {}
+    has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY", ""))
+    has_mistral = bool(os.environ.get("MISTRAL_API_KEY", ""))
+
+    if has_anthropic and has_mistral:
+        st.caption("Using API keys from environment variables.")
     else:
-        st.caption("No `ANTHROPIC_API_KEY` environment variable found.")
-        api_key = st.text_input("Anthropic API Key", type="password",
-                                placeholder="sk-ant-...", key="dev_api_key")
+        if not has_anthropic:
+            api_keys["anthropic"] = st.text_input(
+                "Anthropic API Key (optional)",
+                type="password", placeholder="sk-ant-...", key="dev_key_anthropic",
+            )
+        if not has_mistral:
+            api_keys["mistral"] = st.text_input(
+                "Mistral API Key (optional)",
+                type="password", placeholder="Paste Mistral key...", key="dev_key_mistral",
+            )
+        if has_anthropic or has_mistral:
+            env_providers = [p for p, v in [("Anthropic", has_anthropic), ("Mistral", has_mistral)] if v]
+            st.caption(f"Using {', '.join(env_providers)} key from environment.")
 
     if st.button("Continue") and name.strip():
-        if not api_key_from_env and not api_key.strip():
-            st.error("Please set ANTHROPIC_API_KEY in your environment or enter a key above.")
+        # Need at least one key (from env or manual entry)
+        manual_keys = {k: v.strip() for k, v in api_keys.items() if v.strip()}
+        if not has_anthropic and not has_mistral and not manual_keys:
+            st.error("Enter at least one API key, or set ANTHROPIC_API_KEY / MISTRAL_API_KEY in your environment.")
             st.stop()
         user = {
             "name": name.strip(),
             "email": f"{name.strip().lower()}@dev.local",
-            "api_key": api_key.strip() or None,
+            "api_keys": manual_keys or None,
         }
         st.session_state["user"] = user
         st.rerun()

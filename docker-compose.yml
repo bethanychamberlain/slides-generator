@@ -6,8 +6,9 @@ services:
     volumes:
       - slide-guide-data:/data
     environment:
-      # Required: AI provider API key
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env or environment}
+      # AI provider API keys (at least one required)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       # Required: Azure Entra ID app registration
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}

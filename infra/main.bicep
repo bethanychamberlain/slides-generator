@@ -11,6 +11,10 @@ param location string = resourceGroup().location
 @secure()
 param anthropicApiKey string
 
+@description('Mistral API key (optional — for EU data residency)')
+@secure()
+param mistralApiKey string = ''
+
 @description('Entra ID application (client) ID')
 param azureClientId string
 
@@ -103,6 +107,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
       secrets: [
         { name: 'anthropic-key', value: anthropicApiKey }
+        { name: 'mistral-key', value: mistralApiKey }
         { name: 'azure-client-secret', value: azureClientSecret }
       ]
     }
@@ -117,6 +122,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'ANTHROPIC_API_KEY', secretRef: 'anthropic-key' }
+            { name: 'MISTRAL_API_KEY', secretRef: 'mistral-key' }
             { name: 'AZURE_CLIENT_ID', value: azureClientId }
             { name: 'AZURE_CLIENT_SECRET', secretRef: 'azure-client-secret' }
             { name: 'AZURE_TENANT_ID', value: azureTenantId }

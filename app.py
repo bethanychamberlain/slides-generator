@@ -143,13 +143,22 @@ st.title("Slide Guide Generator")
 
 # --- Authentication ---
 user = require_login()
-set_provider("anthropic", api_key=user.get("api_key"))
 set_current_user(user["email"])
 
-# Show user info + logout in sidebar
+# Show user info + provider selector in sidebar
 with st.sidebar:
     st.write(f"Signed in as **{user['name']}**")
     st.caption(user["email"])
+    provider = st.radio(
+        "AI Provider",
+        options=["anthropic", "mistral"],
+        format_func=lambda k: {"anthropic": "Anthropic (Claude)", "mistral": "Mistral AI (EU)"}[k],
+        captions=["Strongest models", "Data stays in the EU"],
+        horizontal=True,
+        key="provider_select",
+    )
+    manual_key = (user.get("api_keys") or {}).get(provider)
+    set_provider(provider, api_key=manual_key)
     if st.button("Sign out"):
         logout()
 
