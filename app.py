@@ -143,7 +143,7 @@ st.title("Slide Guide Generator")
 
 # --- Authentication ---
 user = require_login()
-set_provider("anthropic")
+set_provider("anthropic", api_key=user.get("api_key"))
 set_current_user(user["email"])
 
 # Show user info + logout in sidebar

@@ -83,15 +83,33 @@ def require_login():
 
 
 def _dev_fallback():
-    """Simple name entry for local development without Entra ID."""
+    """Name + optional API key entry for local development without Entra ID."""
     if st.session_state.get("user"):
         return st.session_state["user"]
 
     st.markdown("### Development Mode")
-    st.caption("No Azure Entra ID configured. Enter a name to continue.")
+    st.caption("No Azure Entra ID configured. Enter your name to continue.")
     name = st.text_input("Your name", key="dev_name")
+
+    # Allow manual API key entry if no ANTHROPIC_API_KEY in environment
+    api_key_from_env = os.environ.get("ANTHROPIC_API_KEY", "")
+    if api_key_from_env:
+        st.caption("Using API key from environment variable.")
+        api_key = ""
+    else:
+        st.caption("No `ANTHROPIC_API_KEY` environment variable found.")
+        api_key = st.text_input("Anthropic API Key", type="password",
+                                placeholder="sk-ant-...", key="dev_api_key")
+
     if st.button("Continue") and name.strip():
-        user = {"name": name.strip(), "email": f"{name.strip().lower()}@dev.local"}
+        if not api_key_from_env and not api_key.strip():
+            st.error("Please set ANTHROPIC_API_KEY in your environment or enter a key above.")
+            st.stop()
+        user = {
+            "name": name.strip(),
+            "email": f"{name.strip().lower()}@dev.local",
+            "api_key": api_key.strip() or None,
+        }
         st.session_state["user"] = user
         st.rerun()
     st.stop()
