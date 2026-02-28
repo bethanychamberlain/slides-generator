@@ -2,11 +2,13 @@
 
 import json
 import hashlib
+import os
 import shutil
 from pathlib import Path
 
 # Cache directory for storing analysis results
-CACHE_DIR = Path(__file__).parent / "analysis_cache"
+_DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+CACHE_DIR = _DATA_DIR / "analysis_cache"
 
 HASH_LENGTH = 16
 

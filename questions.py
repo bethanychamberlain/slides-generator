@@ -2,11 +2,13 @@
 
 import csv
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
 # Questions history CSV for future retrieval
-QUESTIONS_CSV_PATH = Path(__file__).parent / "questions_history.csv"
+_DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+QUESTIONS_CSV_PATH = _DATA_DIR / "questions_history.csv"
 
 CSV_COLUMNS = [
     "timestamp", "source_file", "slide_num", "question_type", "question_text",
