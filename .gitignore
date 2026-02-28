@@ -18,3 +18,9 @@ questions_history.csv
 
 # Session transcripts
 2026-*.txt
+
+# Usage logs (contain user emails)
+usage_logs/
+
+# macOS
+.DS_Store
