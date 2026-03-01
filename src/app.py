@@ -26,6 +26,7 @@ from export_docx import create_docx
 from export_pdf import create_pdf
 from export_html import create_html
 from export_qti import create_canvas_qti
+from usage_logger import cleanup_old_logs
 from questions import (
     QUESTION_TYPES, QUESTION_TYPE_LABELS, format_question_display,
     get_question_text, save_questions_to_csv, QUESTIONS_CSV_PATH,
@@ -141,6 +142,8 @@ def clean_slide_question_keys(slide_num, old_count):
 st.set_page_config(page_title="Slide Guide Generator", layout="wide")
 st.title("Slide Guide Generator")
 
+cleanup_old_logs()
+
 # --- Authentication ---
 user = require_login()
 set_current_user(user["email"])
@@ -191,6 +194,8 @@ if uploaded_file and not st.session_state.analyzed:
 
     if file_size_mb > MAX_FILE_SIZE_MB:
         st.error(f"File is too large ({file_size_mb:.1f} MB). Maximum allowed size is {MAX_FILE_SIZE_MB} MB.")
+    elif not file_bytes[:5] == b"%PDF-":
+        st.error("This file doesn't appear to be a valid PDF. Please upload a PDF file.")
     else:
         st.caption(f"File size: {file_size_mb:.1f} MB")
         file_hash = get_file_hash(file_bytes)
