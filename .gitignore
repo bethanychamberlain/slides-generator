@@ -26,5 +26,12 @@ usage_logs/
 Mistral Vibe Review*.md
 Testing logs from bethany/
 
+# Azure CLI defaults
+.azure/
+
+# Non-essential docs
+docs/plans/
+docs/design-for-power-automate.html
+
 # macOS
 .DS_Store
