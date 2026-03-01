@@ -105,6 +105,7 @@ def _call(model, max_tokens, system, messages):
             max_tokens=max_tokens,
             system=system,
             messages=messages,
+            timeout=120.0,
         )
         log_usage(
             user_email=_current_user,
@@ -121,6 +122,7 @@ def _call(model, max_tokens, system, messages):
             model=model,
             max_tokens=max_tokens,
             messages=full_messages,
+            timeout_ms=120_000,
         )
         log_usage(
             user_email=_current_user,

@@ -22,5 +22,9 @@ questions_history.csv
 # Usage logs (contain user emails)
 usage_logs/
 
+# Audit reports
+Mistral Vibe Review*.md
+Testing logs from bethany/
+
 # macOS
 .DS_Store
