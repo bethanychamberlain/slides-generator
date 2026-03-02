@@ -1,0 +1,35 @@
+services:
+  slide-guide:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - slide-guide-data:/data
+    environment:
+      # AI provider API keys (at least one required)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      # Required: Azure Entra ID app registration
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_REDIRECT_URI=${AZURE_REDIRECT_URI:-http://localhost:8501}
+      # Model overrides (optional — defaults are in ai.py)
+      # - ANTHROPIC_MODEL_FAST=claude-sonnet-4-6
+      # - ANTHROPIC_MODEL_ADVANCED=claude-opus-4-6
+      # - MISTRAL_MODEL_FAST=mistral-medium-latest
+      # - MISTRAL_MODEL_ADVANCED=mistral-large-latest
+    restart: unless-stopped
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+volumes:
+  slide-guide-data:
+    driver: local
