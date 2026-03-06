@@ -31,10 +31,10 @@ Sign in with your admin account when the browser opens.
 ### 2. Create a Resource Group
 
 ```bash
-az group create --name slide-guide-rg --location eastus
+az group create --name slide-guide-rg --location westeurope
 ```
 
-(Change `eastus` to whatever region is closest to your users.)
+(Change `westeurope` to whatever region is closest to your users.)
 
 ### 3. Deploy
 
@@ -53,7 +53,7 @@ This takes 2-5 minutes. When it finishes, it prints the app URL.
 
 ### 4. Set the Redirect URI
 
-Copy the app URL from the output (something like `https://slideguide.bluewater-abc123.eastus.azurecontainerapps.io`).
+Copy the app URL from the output (something like `https://slideguide.bluewater-abc123.westeurope.azurecontainerapps.io`).
 
 Go to Azure Portal → Entra ID → App registrations → Slide Guide Generator → Authentication → Add the URL as a **Redirect URI**.
 
@@ -68,7 +68,7 @@ az deployment group create \
     azureClientId='your-client-id' \
     azureClientSecret='your-client-secret' \
     azureTenantId='your-tenant-id' \
-    redirectUri='https://slideguide.bluewater-abc123.eastus.azurecontainerapps.io'
+    redirectUri='https://slideguide.bluewater-abc123.westeurope.azurecontainerapps.io'
 ```
 
 ### 5. Test It
